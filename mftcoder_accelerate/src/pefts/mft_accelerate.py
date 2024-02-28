@@ -451,10 +451,12 @@ def main():
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    print(f"num_update_steps_per_epoch: {num_update_steps_per_epoch}")
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterward we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+    print(f"num_train_epochs: {args.num_train_epochs}")
 
     # zero 3 flag
     is_ds_zero_3 = False

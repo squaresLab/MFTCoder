@@ -4,7 +4,7 @@
 # Description: An alternative(Command line) way to launch DeepSpeed training
 
 # Launch script on single node
-N_GPU_PER_NODE=3
+N_GPU_PER_NODE=2
 
 # envs used inside training
 export OMP_NUM_THREADS=4
@@ -13,7 +13,7 @@ export TOKENIZERS_PARALLELISM=False
 TODAY=$(date +%Y-%m%d-%H%M)
 
 # accelerate launch --config_file accelerate_ds_config.yaml \
-accelerate launch \
+CUDA_VISIBLE_DEVICES="0, 1" accelerate launch \
     --num_machines 1 \
     --num_processes $N_GPU_PER_NODE \
     --use_deepspeed \
