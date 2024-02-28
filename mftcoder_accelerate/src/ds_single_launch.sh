@@ -4,7 +4,7 @@
 # Description: An alternative(Command line) way to launch DeepSpeed training
 
 # Launch script on single node
-N_GPU_PER_NODE=8
+N_GPU_PER_NODE=3
 
 # envs used inside training
 export OMP_NUM_THREADS=4
@@ -30,6 +30,6 @@ accelerate launch \
     --same_network \
     --machine_rank 0 \
     --rdzv_backend 'static' \
-    pefts/mft_accelerate.py --train_config configs/"xxx_train_config.json" \
+    pefts/mft_accelerate.py --train_config configs/"lora_train_config.json" \
       --distributed_type "deepspeed" \
         > MFTCoder-training-"$TODAY".log 2>&1 &

@@ -119,16 +119,6 @@ mftcoder_accelerate
        |
        evals
 ```
-我们将训练中使用的各种组件抽取出来，以便后续的扩展和优化， 详见```src```目录下的实现。
-
-训练入口文件是```mftcoder_accelerate/src/pefts/mft_accelerate.py```
-
-参数配置存储在```mftcoder_accelerate/src/configs```目录下，方便统一管理和更改。
-
-**_所以，在你开启训练之前，请进入src目录_**
-```
-cd mftcoder_accelerate/src
-```
 
 You can find the implementations in the ```mftcoder_accelerate/src``` directory.
 The entry directory for fine-tuning training is ```mftcoder_accelerate/src```, and the entry file for training is ```mftcoder_accelerate/src/pefts/mft_accelerate.py```. 

@@ -46,6 +46,7 @@ from peft import (
 from accelerate import Accelerator, DistributedType, FullyShardedDataParallelPlugin
 from accelerate.logging import get_logger
 
+
 # insert src as import path
 current_path = os.path.abspath(__file__)
 parent_dir = os.path.dirname(os.path.dirname(current_path))
@@ -312,11 +313,6 @@ def main():
             target_modules=args.target_modules if args.target_modules else FULL_LORA_TARGETING_MODULES[args.model_type]
         )
 
-    # # 是否要加入新的special tokens
-    # num_added_toks = tokenizer.tokenizer.add_special_tokens(["<role_start>", "<role_end>"])
-    # accelerator.print("We have added", num_added_toks, "tokens")
-    # accelerator.print(f"role marker tokens {tokenizer.convert_tokens_to_ids('<role_start>')} {tokenizer.convert_tokens_to_ids('<role_end>')}, resized tokenizer_size: {len(tokenizer)}")
-
     # creating base model
     ModelClass = MODEL_TYPES[args.model_type]
     if args.model_type in SUPPORT_FA2_IN_TRANSFORMERS:
@@ -355,10 +351,6 @@ def main():
 
     # build a tokenizer for possible resizing or saving
     tokenizer = build_tokenizer(args)
-    # Note: resize_token_embeddings expects to receive the full size of the new vocabulary,
-    # i.e. the length of the tokenizer.
-    # 如果新增special tokens, 需要resize input embedding 和output embedding
-    # model.resize_token_embeddings(len(tokenizer), pad_to_multiple_of=32)
 
     accelerator.print("load in 8bit: ", args.quantization == '8bit')
     accelerator.print("load in 4bit: ", args.quantization == '4bit')
