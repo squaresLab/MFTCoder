@@ -30,6 +30,6 @@ CUDA_VISIBLE_DEVICES="0, 1" accelerate launch \
     --same_network \
     --machine_rank 0 \
     --rdzv_backend 'static' \
-    pefts/mft_accelerate.py --train_config configs/"lora_train_config.json" \
+    pefts/mft_accelerate.py --train_config configs/"qlora_train_config.json" \
       --distributed_type "deepspeed" \
         > MFTCoder-training-"$TODAY".log 2>&1 &

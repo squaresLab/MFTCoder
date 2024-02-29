@@ -324,7 +324,7 @@ def main():
             load_in_8bit=(args.quantization == '8bit'),
             load_in_4bit=(args.quantization == '4bit'),
             torch_dtype=torch.bfloat16,
-            # low_cpu_mem_usage=args.low_cpu_mem_usage,  # not for zero3
+            low_cpu_mem_usage=args.low_cpu_mem_usage,  # not for zero3
             # use_safetensors=False,
             quantization_config=BitsAndBytesConfig(
                 load_in_4bit=(args.quantization == '4bit'),
