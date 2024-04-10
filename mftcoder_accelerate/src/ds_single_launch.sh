@@ -4,16 +4,16 @@
 # Description: An alternative(Command line) way to launch DeepSpeed training
 
 # Launch script on single node
-N_GPU_PER_NODE=2
+N_GPU_PER_NODE=3
 
 # envs used inside training
 export OMP_NUM_THREADS=4
 export TOKENIZERS_PARALLELISM=False
-
+export TORCH_CPP_LOG_LEVEL=ERROR
 TODAY=$(date +%Y-%m%d-%H%M)
 
 # accelerate launch --config_file accelerate_ds_config.yaml \
-CUDA_VISIBLE_DEVICES="0, 1" accelerate launch \
+accelerate launch \
     --num_machines 1 \
     --num_processes $N_GPU_PER_NODE \
     --use_deepspeed \
@@ -31,5 +31,5 @@ CUDA_VISIBLE_DEVICES="0, 1" accelerate launch \
     --machine_rank 0 \
     --rdzv_backend 'static' \
     pefts/mft_accelerate.py --train_config configs/"qlora_train_config.json" \
-      --distributed_type "deepspeed" \
+--distributed_type "deepspeed" \
         > MFTCoder-training-"$TODAY".log 2>&1 &

@@ -29,7 +29,7 @@ accelerate launch \
     --same_network \
     --machine_rank=0 \
     --rdzv_backend=static \
-    pefts/mft_accelerate.py --train_config configs/"xxx_train_config.json" \
+    pefts/mft_accelerate.py --train_config configs/"qlora_train_config.json" \
         --distributed_type "fsdp" \
         > MFTCoder-training-"$TODAY".log 2>&1 &
 
