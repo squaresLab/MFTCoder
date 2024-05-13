@@ -16,6 +16,9 @@ from transformers import (
 )
 from peft import PeftModel
 import argparse
+import json
+import jsonlines
+
 
 
 def load_model_tokenizer(
@@ -170,10 +173,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_model_or_path", type=str, default=None)
     parser.add_argument("--adaptor_path", type=str, default=None)
+    parser.add_argument("--eval_path", type=str, default=None)
+
     args = parser.parse_args()
 
     base_model = args.base_model_or_path
     lora_adapter = args.adaptor_path
+    eval_path = args.eval_path
 
     HUMAN_ROLE_START_TAG = "<s>human\n"
     BOT_ROLE_START_TAG = "<s>bot\n"
@@ -196,17 +202,25 @@ if __name__ == "__main__":
 
     prompts = [f"{HUMAN_ROLE_START_TAG}{text}{BOT_ROLE_START_TAG}" for text in texts]
 
+    # read json from file
+    with jsonlines.open(eval_path, 'r') as jsonl_f:
+        data = [obj for obj in jsonl_f]
+
+    for d in data:
+        chat_rounds = d["chat_rounds"]
+        question = chat_rounds[1]["content"]
+        answer = chat_rounds[2]["content"]
+        print(question)
+        
+        print(answer)
+        break
     
     current_directory = os.getcwd()
-    model, tokenizer = load_model_tokenizer(
-        base_model,
-        model_type="",
-        peft_path=lora_adapter,
-        eos_token="</s>",
-        pad_token="<unk>",
-    )
-
-    # hf_inference(
-    #     model, tokenizer, prompts, do_sample=False, num_beams=1, num_return_sequences=1
+    # model, tokenizer = load_model_tokenizer(
+    #     base_model,
+    #     model_type="",
+    #     peft_path=lora_adapter,
+    #     eos_token="</s>",
+    #     pad_token="<unk>",
     # )
-    hf_inference(model, tokenizer, prompts, do_sample=True, temperature=0.8)
+    # hf_inference(model, tokenizer, prompts, do_sample=True, temperature=0.8)

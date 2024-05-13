@@ -4,7 +4,7 @@
 # Description: An alternative(Command line) way to launch DeepSpeed training
 
 # Launch script on single node
-N_GPU_PER_NODE=3
+N_GPU_PER_NODE=2
 
 # envs used inside training
 export OMP_NUM_THREADS=4
