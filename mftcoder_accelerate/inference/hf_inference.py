@@ -1,24 +1,13 @@
-# -*- coding: utf-8 -*-
-# @author Chaoyu Chen
-# @date 2024/1/4
-# @module hf_inference.py
-
 import os
 import sys
 import torch
-import textwrap
 from transformers import (
     AutoConfig,
     AutoTokenizer,
     AutoModelForCausalLM,
-    StoppingCriteria,
-    StoppingCriteriaList,
 )
 from peft import PeftModel
 import argparse
-import json
-import jsonlines
-
 
 
 def load_model_tokenizer(
@@ -171,9 +160,21 @@ def hf_inference(
 if __name__ == "__main__":
     # arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_model_or_path", type=str, default=None)
-    parser.add_argument("--adaptor_path", type=str, default=None)
-    parser.add_argument("--eval_path", type=str, default=None)
+    parser.add_argument(
+        "--base_model_or_path", type=str, default=None, help="Path to the base model"
+    )
+    parser.add_argument(
+        "--adaptor_path", type=str, default=None, help="Path to the adaptor checkpoint"
+    )
+    parser.add_argument(
+        "--eval_path", type=str, default=None, help="Path to the evaluation file"
+    )
+    parser.add_argument(
+        "--give_expl",
+        action="store_true",
+        default=None,
+        help="Give explanation for the vulnerability as prompt",
+    )
 
     args = parser.parse_args()
 
@@ -185,42 +186,69 @@ if __name__ == "__main__":
     BOT_ROLE_START_TAG = "<s>bot\n"
 
     localization_instruction = """
-    Find which lines in following code has a security vulnerability:
-    /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */\n#include \"k5-int.h\"\n#include <kadm5/admin.h>\n#include <syslog.h>\n#include <adm_proto.h>  /* krb5_klog_syslog */\n#include <stdio.h>\n#include <errno.h>\n\n#include \"kadm5/server_internal.h\" /* XXX for kadm5_server_handle_t */\n\n#include \"misc.h\"\n\n#ifndef GETSOCKNAME_ARG3_TYPE\n#define GETSOCKNAME_ARG3_TYPE int\n#endif\n\n#define RFC3244_VERSION 0xff80\n\nstatic krb5_error_code\nprocess_chpw_request(krb5_context context, void *server_handle, char *realm,\n                     krb5_keytab keytab, const krb5_fulladdr *local_faddr,\n                     const krb5_fulladdr *remote_faddr, krb5_data *req,\n                     krb5_data *rep)\n{\n    krb5_error_code ret;\n    char *ptr;\n    unsigned int plen, vno;\n    krb5_data ap_req, ap_rep = empty_data();\n    krb5_data cipher = empty_data(), clear = empty_data();\n    krb5_auth_context auth_context = NULL;\n    krb5_principal changepw = NULL;\n    krb5_principal client, target = NULL;\n    krb5_ticket *ticket = NULL;\n    krb5_replay_data replay;\n    krb5_error krberror;\n    int numresult;\n    char strresult[1024];\n    char *clientstr = NULL, *targetstr = NULL;\n    const char *errmsg = NULL;\n    size_t clen;\n    char *cdots;\n    struct sockaddr_storage ss;\n    socklen_t salen;\n    char addrbuf[100];\n    krb5_address *addr = remote_faddr->address;\n\n    *rep = empty_data();\n\n    if (req->length < 4) {\n        /* either this, or the server is printing bad messages,\n           or the caller passed in garbage */\n        ret = KRB5KRB_AP_ERR_MODIFIED;\n        numresult = KRB5_KPASSWD_MALFORMED;\n        strlcpy(strresult, \"Request was truncated\", sizeof(strresult));\n        goto chpwfail;\n    }\n\n    ptr = req->data;\n\n    /* verify length */\n\n    plen = (*ptr++ & 0xff);\n    plen = (plen<<8) | (*ptr++ & 0xff);\n\n    if (plen != req->length) {\n        ret = KRB5KRB_AP_ERR_MODIFIED;\n        numresult = KRB5_KPASSWD_MALFORMED;\n        strlcpy(strresult, \"Request length was inconsistent\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    /* verify version number */\n\n    vno = (*ptr++ & 0xff) ;\n    vno = (vno<<8) | (*ptr++ & 0xff);\n\n    if (vno != 1 && vno != RFC3244_VERSION) {\n        ret = KRB5KDC_ERR_BAD_PVNO;\n        numresult = KRB5_KPASSWD_BAD_VERSION;\n        snprintf(strresult, sizeof(strresult),\n                 \"Request contained unknown protocol version number %d\", vno);\n        goto chpwfail;\n    }\n\n    /* read, check ap-req length */\n\n    ap_req.length = (*ptr++ & 0xff);\n    ap_req.length = (ap_req.length<<8) | (*ptr++ & 0xff);\n\n    if (ptr + ap_req.length >= req->data + req->length) {\n        ret = KRB5KRB_AP_ERR_MODIFIED;\n        numresult = KRB5_KPASSWD_MALFORMED;\n        strlcpy(strresult, \"Request was truncated in AP-REQ\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    /* verify ap_req */\n\n    ap_req.data = ptr;\n    ptr += ap_req.length;\n\n    ret = krb5_auth_con_init(context, &auth_context);\n    if (ret) {\n        numresult = KRB5_KPASSWD_HARDERROR;\n        strlcpy(strresult, \"Failed initializing auth context\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    ret = krb5_auth_con_setflags(context, auth_context,\n                                 KRB5_AUTH_CONTEXT_DO_SEQUENCE);\n    if (ret) {\n        numresult = KRB5_KPASSWD_HARDERROR;\n        strlcpy(strresult, \"Failed initializing auth context\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    ret = krb5_build_principal(context, &changepw, strlen(realm), realm,\n                               \"kadmin\", \"changepw\", NULL);\n    if (ret) {\n        numresult = KRB5_KPASSWD_HARDERROR;\n        strlcpy(strresult, \"Failed building kadmin/changepw principal\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    ret = krb5_rd_req(context, &auth_context, &ap_req, changepw, keytab,\n                      NULL, &ticket);\n\n    if (ret) {\n        numresult = KRB5_KPASSWD_AUTHERROR;\n        strlcpy(strresult, \"Failed reading application request\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    /* construct the ap-rep */\n\n    ret = krb5_mk_rep(context, auth_context, &ap_rep);\n    if (ret) {\n        numresult = KRB5_KPASSWD_AUTHERROR;\n        strlcpy(strresult, \"Failed replying to application request\",\n                sizeof(strresult));\n        goto chpwfail;\n    }\n\n    /* decrypt the ChangePasswdData */\n\n    cipher.length = (req->data + req->length) - ptr;\n    cipher.data = ptr;\n\n    /*\n     * Don't set a remote address in auth_context before calling krb5_rd_priv,\n     * so that we can work against clients behind a NAT.  Reflection attacks\n     * aren't a concern since we use sequence numbers and since our requests\n     * don't look anything like our responses.  Also don't set a local address,\n     * since we don't know what interface the request was received on.\n     */\n\n    ret = krb5_rd_priv(context, auth_context, &cipher, &clear, &replay);\n    if (ret) {\n        numresult = KRB5_KPASSWD_HARDERROR;\n        strlcpy(strresult, \"Failed decrypting request\", sizeof(strresult));\n        goto chpwfail;\n    }\n\n
-    \n
-    """
+    Does the following code have a security vulnerability:
 
-    type_instruction = """
-    Which type of CWE vulnerability is present in the above code?\n
+    '''
+    public boolean checkUserPassword(String userId, String password) {
+    if (StringUtils.isBlank(userId)) {
+        MSException.throwException(Translator.get("user_name_is_null"));
+    }
+    if (StringUtils.isBlank(password)) {
+        MSException.throwException(Translator.get("password_is_null"));
+    }
+    UserExample example = new UserExample();
+    example.createCriteria().andIdEqualTo(userId).andPasswordEqualTo(CodingUtil.md5(password));
+    return userMapper.countByExample(example) > 0;
+    }
+
+    public UserDTO loginLocalMode(String userId, String password) {
+    UserDTO user = getLoginUser(userId, Collections.singletonList(UserSource.LOCAL.name()));
+    if (user == null) {
+        user = getUserDTOByEmail(userId, UserSource.LOCAL.name());
+        if (user == null) {
+            throw new RuntimeException(Translator.get("password_is_incorrect"));
+        }
+        userId = user.getId();
+    }
+    if (!checkUserPassword(userId, password)) {
+        throw new RuntimeException(Translator.get("password_is_incorrect"));
+    }
+    user.setPassword(null);
+    return user;
+    '''
+
+
+}
+  
     """
 
     explanation_instruction = """
-    What is the impact of the vulnerability in the above code?\n
+    What is the impact of the vulnerability in the above code? How would an attacker use this vulnerability?
     """
 
-    texts = [localization_instruction, type_instruction, explanation_instruction]
+    if args.give_expl:
+        localization_instruction += """
+            As context, this code is apart of MeterSphere, an open source continuous testing platform.
+            The `checkUserPassword` method is used to check whether the password provided by the user matches the password saved in the database.
 
+            Notice that the code does not perform a check on userId or password length, potentially leading to allocation of too much memory. 
+        """
+        explanation_instruction = (
+            """
+            The actual CWE is CWE-770 (allocation of resources without
+            limits or throttling) """
+            + explanation_instruction
+        )
+
+    texts = [localization_instruction, explanation_instruction]
     prompts = [f"{HUMAN_ROLE_START_TAG}{text}{BOT_ROLE_START_TAG}" for text in texts]
 
-    # read json from file
-    with jsonlines.open(eval_path, 'r') as jsonl_f:
-        data = [obj for obj in jsonl_f]
-
-    for d in data:
-        chat_rounds = d["chat_rounds"]
-        question = chat_rounds[1]["content"]
-        answer = chat_rounds[2]["content"]
-        print(question)
-        
-        print(answer)
-        break
-    
     current_directory = os.getcwd()
-    # model, tokenizer = load_model_tokenizer(
-    #     base_model,
-    #     model_type="",
-    #     peft_path=lora_adapter,
-    #     eos_token="</s>",
-    #     pad_token="<unk>",
-    # )
-    # hf_inference(model, tokenizer, prompts, do_sample=True, temperature=0.8)
+    model, tokenizer = load_model_tokenizer(
+        base_model,
+        model_type="",
+        peft_path=lora_adapter,
+        eos_token="</s>",
+        pad_token="<unk>",
+    )
+    hf_inference(model, tokenizer, prompts, do_sample=True, temperature=0.8)
