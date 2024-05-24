@@ -3,6 +3,5 @@
 *.log
 */__pycache__/
 *.pyc
-tensorboard/events.out.tfevents.1709910865.230d10ac5497.30.0
-**tensorboard**
+tensorboard
 
